@@ -1,0 +1,205 @@
+#Code to Program the microcontroller.
+Master 1:
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2591.h>
+
+Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
+
+// Slave MAC addresses
+uint8_t slave1[] = {0x84, 0xF3, 0xEB, 0x0C, 0x94, 0x7E};
+uint8_t slave2[] = {0xE8, 0x9F, 0x6D, 0x93, 0xB8, 0x8C};
+uint8_t slave3[] = {0x24, 0x4C, 0xAB, 0x53, 0x9F, 0x4B};
+uint8_t slave4[] = {0x2C, 0xF4, 0x32, 0x1A, 0x59, 0xB2};
+uint8_t slave5[] = {0xC4, 0x5B, 0xBE, 0x6D, 0x7F, 0x88};
+
+// Light threshold (adjust as needed)
+#define LIGHT_THRESHOLD 50
+
+typedef struct struct_message {
+  bool turnOn;
+} struct_message;
+
+struct_message myData;
+
+unsigned long lastCheckTime = 0;
+const long checkInterval = 10000; // 10 seconds
+
+void setup() {
+  Wire.begin();
+  
+  WiFi.mode(WIFI_STA);
+  
+  if (esp_now_init() != 0) {
+    return;
+  }
+  
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+  
+  // Register peers
+  esp_now_add_peer(slave1, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave2, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave3, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave4, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave5, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  
+  // Initialize TSL2591
+  if (!tsl.begin()) {
+    return;
+  }
+  
+  tsl.setGain(TSL2591_GAIN_MED);
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
+}
+
+void loop() {
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastCheckTime >= checkInterval) {
+    lastCheckTime = currentTime;
+    
+    // Read light intensity
+    uint32_t lum = tsl.getFullLuminosity();
+    uint16_t ir = lum >> 16;
+    uint16_t full = lum & 0xFFFF;
+    uint16_t visible = full - ir;
+    float lux = tsl.calculateLux(full, ir);
+    
+    // Determine if lights should be on
+    bool shouldTurnOn = (lux < LIGHT_THRESHOLD);
+    myData.turnOn = shouldTurnOn;
+    
+    // Send to all slaves
+    esp_now_send(slave1, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave2, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave3, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave4, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave5, (uint8_t *) &myData, sizeof(myData));
+  }
+  
+  delay(100);
+}
+Master 2:
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2591.h>
+
+Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
+
+// Slave MAC addresses
+uint8_t slave1[] = {0xA8, 0x48, 0xFA, 0xCD, 0x96, 0x54};
+uint8_t slave2[] = {0x08, 0xF9, 0xE0, 0x60, 0xC5, 0x39};
+uint8_t slave3[] = {0x08, 0xF9, 0xE0, 0x72, 0xEE, 0xD0};
+uint8_t slave4[] = {0x24, 0xD7, 0xEB, 0xCD, 0x06, 0x9B};
+uint8_t slave5[] = {0xC8, 0xC9, 0xA3, 0x64, 0xD2, 0x08};
+
+// Light threshold (adjust as needed)
+#define LIGHT_THRESHOLD 50
+
+typedef struct struct_message {
+  bool turnOn;
+} struct_message;
+
+struct_message myData;
+
+unsigned long lastCheckTime = 0;
+const long checkInterval = 10000; // 10 seconds
+
+void setup() {
+  Wire.begin();
+  
+  WiFi.mode(WIFI_STA);
+  
+  if (esp_now_init() != 0) {
+    return;
+  }
+  
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+  
+  // Register peers
+  esp_now_add_peer(slave1, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave2, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave3, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave4, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  esp_now_add_peer(slave5, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  
+  // Initialize TSL2591
+  if (!tsl.begin()) {
+    return;
+  }
+  
+  tsl.setGain(TSL2591_GAIN_MED);
+  tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
+}
+
+void loop() {
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastCheckTime >= checkInterval) {
+    lastCheckTime = currentTime;
+    
+    // Read light intensity
+    uint32_t lum = tsl.getFullLuminosity();
+    uint16_t ir = lum >> 16;
+    uint16_t full = lum & 0xFFFF;
+    uint16_t visible = full - ir;
+    float lux = tsl.calculateLux(full, ir);
+    
+    // Determine if lights should be on
+    bool shouldTurnOn = (lux < LIGHT_THRESHOLD);
+    myData.turnOn = shouldTurnOn;
+    
+    // Send to all slaves
+    esp_now_send(slave1, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave2, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave3, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave4, (uint8_t *) &myData, sizeof(myData));
+    esp_now_send(slave5, (uint8_t *) &myData, sizeof(myData));
+  }
+  
+  delay(100);
+}
+
+Slaves:
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+
+#define RELAY_PIN D4
+
+typedef struct struct_message {
+  bool turnOn;
+} struct_message;
+
+struct_message receivedData;
+
+void setup() {
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);
+
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != 0) {
+    return;
+  }
+
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_register_recv_cb(OnDataRecv);
+}
+
+void loop() {
+  delay(1000);
+}
+
+void OnDataRecv(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  memcpy(&receivedData, incomingData, sizeof(receivedData));
+
+  if (receivedData.turnOn) {
+    digitalWrite(RELAY_PIN, LOW);
+  } else {
+    digitalWrite(RELAY_PIN, HIGH);
+  }
+}
